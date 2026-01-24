@@ -1,0 +1,44 @@
+{
+  "name": "@prgrmrwy/install-skill-get",
+  "version": "0.0.4",
+  "description": "Install Claude Code skill-get - A unified skill installer for Claude Code from multiple sources",
+  "main": "lib/install.js",
+  "bin": {
+    "install-skill-get": "bin/cli.js"
+  },
+  "scripts": {
+    "install-skill": "node lib/install.js",
+    "install-global": "node lib/install.js --global",
+    "install-local": "node lib/install.js --local"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "skill",
+    "skill-get",
+    "ai-tools",
+    "anthropic"
+  ],
+  "author": "prgrmr",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/prgrmrwy/ai-tools.git",
+    "directory": "packages/skill-get"
+  },
+  "bugs": {
+    "url": "https://github.com/prgrmrwy/ai-tools/issues"
+  },
+  "homepage": "https://github.com/prgrmrwy/ai-tools/tree/main/.claude/skills/skill-get#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "README.md"
+  ]
+}
