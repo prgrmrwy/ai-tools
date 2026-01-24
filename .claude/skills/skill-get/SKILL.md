@@ -3,6 +3,27 @@ name: skill-get
 description: Unified installer for Claude Code Skills from multiple sources. Triggered when users request to install skills, search for skills, list installed skills, update skills, query supported marketplaces/sources, skill-get help, package skills, compile skills, or mention skill names/URLs. Supports: (1) Official repository github.com/anthropics/skills, (2) Third-party marketplaces (skillsmp.com, prompts.chat, skillhub.club, smithery.ai, etc.), (3) GitHub search, (4) Direct Git/HTTP URLs, (5) Local paths, (6) Packaging skills as .skill files, (7) Updating installed skills.
 ---
 
+## Language Preference / 语言偏好
+
+**IMPORTANT**: Detect user's language preference and respond accordingly.
+
+| User Language | Response Language | Reference Document |
+|---------------|-------------------|-------------------|
+| Chinese (中文) | Chinese | [SKILL_ZH_CN.md](SKILL_ZH_CN.md) |
+| English | English | This document |
+| Other | Match user's language | This document (adapt) |
+
+**Detection methods**:
+1. User's message language (highest priority)
+2. Previous conversation language
+3. System locale if available
+
+**Example**:
+- User says "安装 playwright" → Respond in Chinese, use Chinese prompts
+- User says "install playwright" → Respond in English, use English prompts
+
+---
+
 # Skill Get
 
 Install skills from any source with a single command.

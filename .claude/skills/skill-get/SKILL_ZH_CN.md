@@ -3,6 +3,27 @@ name: skill-get
 description: 从多种来源安装Claude Code Skills的统一安装器。当用户请求安装skill、查找skill、列出已安装skills、更新skill、查询支持哪些marketplace/来源、skill-get help、打包skill、编译skill、或提到skill名称/URL时触发。支持：(1)官方仓库 github.com/anthropics/skills，(2)第三方Marketplace（skillsmp.com、prompts.chat、skillhub.club、smithery.ai等），(3)GitHub搜索，(4)直接Git/HTTP URL，(5)本地路径，(6)打包skill为.skill文件，(7)更新已安装的skill。
 ---
 
+## 语言偏好 / Language Preference
+
+**重要**：检测用户的语言偏好并使用对应语言响应。
+
+| 用户语言 | 响应语言 | 参考文档 |
+|----------|----------|----------|
+| 中文 | 中文 | 本文档 |
+| English | English | [SKILL.md](SKILL.md) |
+| 其他 | 匹配用户语言 | 本文档（适配） |
+
+**检测方法**：
+1. 用户消息的语言（最高优先级）
+2. 之前对话使用的语言
+3. 系统区域设置（如可用）
+
+**示例**：
+- 用户说 "安装 playwright" → 使用中文响应和提示
+- 用户说 "install playwright" → 使用英文响应和提示
+
+---
+
 # Skill Get
 
 一句话从任意来源安装Skill到本地。
