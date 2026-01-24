@@ -39,46 +39,48 @@ scripts/install_skill.sh /path/to/skill ~/.claude/skills
 
 #### ⚠️ 搜索约束（必须遵守）
 
-1. **严格按优先级顺序搜索**：必须从优先级 1 开始，依次搜索到优先级 8，不可跳跃
+1. **严格按优先级顺序搜索**：必须从优先级 1 开始，依次搜索到优先级 9，不可跳跃
 2. **禁止跳过任何来源**：即使某个来源很可能没有结果，也必须执行搜索
 3. **实时显示搜索进度**：每搜索一个来源，必须向用户显示当前正在搜索的来源名称
 4. **找到即停止**：一旦在某个来源找到匹配结果，立即停止搜索并展示结果
-5. **全部搜索完才报未找到**：只有当所有 8 个来源都搜索完毕且无结果时，才能报告"未找到"
+5. **全部搜索完才报未找到**：只有当所有 9 个来源都搜索完毕且无结果时，才能报告"未找到"
+6. **GitHub 搜索兜底**：GitHub 搜索放在最后（第 9 步），优先从第三方 Marketplace 获取精准结果
 
 #### 搜索进度显示格式
 
 ```
 🔍 正在搜索 "skill-name"...
 
-[1/8] 搜索 github.com/anthropics/skills ... ❌ 未找到
-[2/8] 搜索 skillsmp.com ... ❌ 未找到
-[3/8] 搜索 prompts.chat/skills ... ✅ 找到匹配！
+[1/9] 搜索 github.com/anthropics/skills ... ❌ 未找到
+[2/9] 搜索 prompts.chat (MCP API) ... ✅ 找到匹配！
 ```
 
-#### 搜索步骤
+> **注意**: GitHub 搜索放在第 9 步（最后）作为兜底，避免同名混淆。
 
-**Step 1/8: 官方仓库 (github.com/anthropics/skills)**
+#### 搜索步骤（按有效性排序，GitHub搜索兜底）
+
+> **设计原则**: 优先从第三方 Marketplace 进行精准搜索，GitHub 搜索作为兜底能力放在最后，避免同名混淆。
+
+**Step 1/9: 官方仓库 (github.com/anthropics/skills)** ⭐ 官方优先
 ```bash
-echo "[1/8] 搜索 github.com/anthropics/skills ..."
+echo "[1/9] 搜索 github.com/anthropics/skills ..."
 curl -s "https://api.github.com/repos/anthropics/skills/contents/skills" | jq -r '.[] | select(.type=="dir") | .name' | grep -i "{keyword}"
 ```
 
-**Step 2/8: SkillsMP (skillsmp.com)**
-
-先用 curl 探测是否存在，再尝试 npx 安装：
-```bash
-echo "[2/8] 搜索 skillsmp.com ..."
-# 探测 skill 是否存在
-curl -sL -A "Mozilla/5.0" "https://skillsmp.com/skills/{skill-name}" | grep -oE 'npx skills add [a-zA-Z0-9_-]+'
-# 如果存在，执行安装
-npx skills add {skill-name}
-```
-
-**Step 3/8: Prompts.chat Skills (prompts.chat/skills)**
+**Step 2/9: Prompts.chat Skills (prompts.chat/skills)** ⭐⭐ MCP API最佳
 
 prompts.chat 提供 MCP API，**优先使用 MCP 工具**：
 
 **方法1: MCP API (推荐)**
+
+直接调用 MCP 端点：
+```bash
+echo "[2/9] 搜索 prompts.chat (MCP API) ..."
+curl -sL -X POST "https://prompts.chat/api/mcp" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"search_skills","arguments":{"query":"{skill-name}","limit":10}},"id":1}'
+```
 
 如果 MCP 服务器已配置 (`prompts.chat: https://prompts.chat/api/mcp`)，使用：
 - `search_skills` - 搜索 skills
@@ -92,17 +94,7 @@ search_skills(query="{skill-name}", limit=10)
 get_skill(id="{skill-id}")
 ```
 
-**方法2: HTTP API (备用)**
-```bash
-echo "[3/8] 搜索 prompts.chat/skills ..."
-# 搜索 API
-curl -sL "https://prompts.chat/api/skills/search?q={skill-name}&limit=10" | jq '.skills[]'
-
-# 获取 skill 完整内容
-curl -sL "https://prompts.chat/api/skills/{skill-id}" | jq '.files[]'
-```
-
-**方法3: 页面抓取 (最后手段)**
+**方法2: 页面抓取 (备用)**
 ```bash
 curl -sL -A "Mozilla/5.0" "https://prompts.chat/skills?q={skill-name}" | grep -oE '/prompts/[a-zA-Z0-9_-]+'
 ```
@@ -112,35 +104,65 @@ curl -sL -A "Mozilla/5.0" "https://prompts.chat/skills?q={skill-name}" | grep -o
 2. 创建目录 `.claude/skills/{slug}/`
 3. 保存 SKILL.md 和其他文件到对应位置
 
-**Step 4/8: SkillHub (skillhub.club)**
+**Step 3/9: Skills.sh (skills.sh)** ⭐⭐ REST API + npx
+
+Vercel 官方维护的 Agent Skills 目录：
 ```bash
-echo "[4/8] 搜索 skillhub.club ..."
-curl -sL -A "Mozilla/5.0" "https://skillhub.club/skills/{skill-name}" | grep -oE 'github\.com/[a-zA-Z0-9_/-]+'
+echo "[3/9] 搜索 skills.sh ..."
+# REST API 获取 skills 列表
+curl -sL "https://skills.sh/api/skills" | jq -r '.skills[] | select(.name | test("{keyword}"; "i")) | "\(.name) (⭐\(.installs)) - \(.topSource)"'
 ```
 
-**Step 5/8: Smithery (smithery.ai/skills)**
+**安装方式**:
 ```bash
-echo "[5/8] 搜索 smithery.ai/skills ..."
+npx skills add {owner}/{repo}
+npx skills add vercel-labs/agent-skills
+```
+
+**Step 4/9: mcpservers.org/claude-skills** ⭐ 结构化目录
+```bash
+echo "[4/9] 搜索 mcpservers.org/claude-skills ..."
+curl -sL -A "Mozilla/5.0" "https://mcpservers.org/claude-skills" | grep -oE 'href="/claude-skills/[^"]+' | grep -i "{keyword}"
+```
+
+**Step 5/9: SkillHub (skillhub.club)** ⭐ 分类浏览
+```bash
+echo "[5/9] 搜索 skillhub.club ..."
+curl -sL -A "Mozilla/5.0" "https://skillhub.club" | grep -oE 'href="/skills/[^"]+' | grep -i "{keyword}"
+```
+
+**Step 6/9: Claude Marketplaces (claudemarketplaces.com)** ⚠️ 部分可用
+```bash
+echo "[6/9] 搜索 claudemarketplaces.com ..."
+curl -sL -A "Mozilla/5.0" "https://claudemarketplaces.com" | grep -oE 'github\.com/[a-zA-Z0-9_/-]+'
+```
+
+**Step 7/9: SkillsMP (skillsmp.com)** ❌ Cloudflare保护
+
+Cloudflare 403 保护，优先使用 npx 直接安装：
+```bash
+echo "[7/9] 搜索 skillsmp.com ..."
+# 直接尝试 npx 安装（无需搜索）
+npx skills add {skill-name}
+
+# 或 curl 探测（可能被拦截）
+curl -sL -A "Mozilla/5.0" "https://skillsmp.com/skills/{skill-name}" | grep -oE 'npx skills add [a-zA-Z0-9_-]+'
+```
+
+**Step 8/9: Smithery (smithery.ai/skills)** ❌ 限流严重
+```bash
+echo "[8/9] 搜索 smithery.ai/skills ..."
+# 注意: 该站点 HTTP 429 限流严重，可能失败
 curl -sL -A "Mozilla/5.0" "https://smithery.ai/skills/{skill-name}" | grep -oE 'github\.com/[a-zA-Z0-9_/-]+'
 ```
 
-**Step 6/8: MCP Servers (mcpservers.org/claude-skills)**
+**Step 9/9: GitHub 搜索 (兜底)** ⭐ 最后搜索，避免同名混淆
 ```bash
-echo "[6/8] 搜索 mcpservers.org/claude-skills ..."
-curl -sL -A "Mozilla/5.0" "https://mcpservers.org/claude-skills?q={skill-name}" | grep -oE 'github\.com/[a-zA-Z0-9_/-]+'
-```
-
-**Step 7/8: Claude Marketplaces (claudemarketplaces.com)**
-```bash
-echo "[7/8] 搜索 claudemarketplaces.com ..."
-curl -sL -A "Mozilla/5.0" "https://claudemarketplaces.com/skills?q={skill-name}" | grep -oE 'github\.com/[a-zA-Z0-9_/-]+'
-```
-
-**Step 8/8: GitHub 搜索**
-```bash
-echo "[8/8] 搜索 GitHub ..."
+echo "[9/9] 搜索 GitHub (兜底) ..."
 curl -s "https://api.github.com/search/repositories?q=claude+skill+{keyword}&sort=stars&per_page=5" | jq -r '.items[] | "\(.full_name) ⭐\(.stargazers_count)"'
 ```
+
+> **说明**: GitHub 搜索放在最后是因为搜索结果可能包含大量不相关项目，容易出现同名混淆。优先从第三方 Marketplace 搜索可以获得更精准的结果。
 
 详见 [references/marketplaces.md](references/marketplaces.md)
 
@@ -156,20 +178,21 @@ scripts/list_skills.sh
 
 当用户问"支持哪些marketplace"、"有哪些skill来源"、"skill-get help"等问题时，展示支持的来源列表和配置说明：
 
-#### 默认搜索顺序
+#### 默认搜索顺序（按有效性排序，GitHub搜索兜底）
 
-| 优先级 | 来源 | 说明 |
-|--------|------|------|
-| 1 | github.com/anthropics/skills | 官方Skill仓库 |
-| 2 | skillsmp.com | 71000+ agent skills |
-| 3 | prompts.chat/skills | Prompts.chat Skills目录 |
-| 4 | skillhub.club | 7000+ AI评估的Skills |
-| 5 | smithery.ai/skills | MCP和Skill聚合 |
-| 6 | mcpservers.org/claude-skills | MCP与Skill整合目录 |
-| 7 | claudemarketplaces.com | Claude Code marketplace目录聚合 |
-| 8 | GitHub搜索 | 按Star排序搜索公开仓库 |
-| 9 | 直接Git/HTTP URL | 用户提供完整地址 |
-| 10 | 本地路径 | 复制本地文件夹 |
+| 优先级 | 来源 | 有效性 | 说明 |
+|--------|------|--------|------|
+| 1 | github.com/anthropics/skills | ⭐ 官方 | 官方Skill仓库，API稳定 |
+| 2 | prompts.chat/skills | ⭐⭐ 最佳 | MCP API，可获取完整内容 |
+| 3 | skills.sh | ⭐⭐ 优秀 | Vercel官方，REST API + npx |
+| 4 | mcpservers.org/claude-skills | ⭐ 有效 | 结构化目录，页面抓取 |
+| 5 | skillhub.club | ⭐ 有效 | 分类浏览，页面抓取 |
+| 6 | claudemarketplaces.com | ⚠️ 部分 | 首页可访问，/skills 404 |
+| 7 | skillsmp.com | ❌ 困难 | Cloudflare 403保护，需npx |
+| 8 | smithery.ai/skills | ❌ 最难 | HTTP 429限流严重 |
+| 9 | GitHub搜索 | ⭐ 兜底 | **放最后**，避免同名混淆 |
+| - | 直接Git/HTTP URL | - | 用户提供完整地址 |
+| - | 本地路径 | - | 复制本地文件夹 |
 
 #### 自定义搜索顺序
 
@@ -180,15 +203,18 @@ scripts/list_skills.sh
   "marketplaces": [
     "github.com/anthropics/skills",
     "prompts.chat/skills",
-    "skillsmp.com",
-    "skillhub.club",
-    "smithery.ai/skills",
+    "skills.sh",
     "mcpservers.org/claude-skills",
+    "skillhub.club",
     "claudemarketplaces.com",
+    "skillsmp.com",
+    "smithery.ai/skills",
     "github-search"
   ]
 }
 ```
+
+> **注意**: `github-search` 放在最后作为兜底能力。
 
 **说明**：
 - 数组顺序决定搜索优先级
@@ -477,16 +503,17 @@ AI: 正在安装...
 
 AI: 🔍 正在搜索 "nonexistent-skill"...
 
-[1/8] 搜索 github.com/anthropics/skills ... ❌ 未找到
-[2/8] 搜索 skillsmp.com ... ❌ 未找到
-[3/8] 搜索 prompts.chat/skills ... ❌ 未找到
-[4/8] 搜索 skillhub.club ... ❌ 未找到
-[5/8] 搜索 smithery.ai/skills ... ❌ 未找到
-[6/8] 搜索 mcpservers.org/claude-skills ... ❌ 未找到
-[7/8] 搜索 claudemarketplaces.com ... ❌ 未找到
-[8/8] 搜索 GitHub ... ❌ 未找到
+[1/9] 搜索 github.com/anthropics/skills ... ❌ 未找到
+[2/9] 搜索 prompts.chat (MCP API) ... ❌ 未找到
+[3/9] 搜索 skills.sh ... ❌ 未找到
+[4/9] 搜索 mcpservers.org/claude-skills ... ❌ 未找到
+[5/9] 搜索 skillhub.club ... ❌ 未找到
+[6/9] 搜索 claudemarketplaces.com ... ❌ 未找到
+[7/9] 搜索 skillsmp.com (npx) ... ❌ 未找到
+[8/9] 搜索 smithery.ai/skills ... ❌ 未找到
+[9/9] 搜索 GitHub (兜底) ... ❌ 未找到
 
-❌ 在所有 8 个来源中均未找到 "nonexistent-skill"
+❌ 在所有 9 个来源中均未找到 "nonexistent-skill"
 
 您可以：
 1. 检查 skill 名称拼写
@@ -514,27 +541,30 @@ AI: ## skill-get 帮助
 | 解包 {file} | 解压 .skill 文件 |
 | help | 显示此帮助 |
 
-### 搜索顺序（默认）
+### 搜索顺序（按有效性排序，GitHub兜底）
 
-| 优先级 | 来源 | 说明 |
-|--------|------|------|
-| 1 | github.com/anthropics/skills | 官方Skill仓库 |
-| 2 | skillsmp.com | 71000+ agent skills |
-| 3 | prompts.chat/skills | Prompts.chat Skills目录 |
-| 4 | skillhub.club | 7000+ AI评估的Skills |
-| 5 | smithery.ai/skills | MCP和Skill聚合 |
-| 6 | mcpservers.org/claude-skills | MCP与Skill整合目录 |
-| 7 | claudemarketplaces.com | Claude Code marketplace聚合 |
-| 8 | GitHub搜索 | 按Star排序搜索公开仓库 |
+| 优先级 | 来源 | 有效性 | 说明 |
+|--------|------|--------|------|
+| 1 | github.com/anthropics/skills | ⭐ | 官方仓库，API稳定 |
+| 2 | prompts.chat/skills | ⭐⭐ | MCP API最佳 |
+| 3 | skills.sh | ⭐⭐ | REST API + npx |
+| 4 | mcpservers.org | ⭐ | 结构化目录 |
+| 5 | skillhub.club | ⭐ | 分类浏览 |
+| 6 | claudemarketplaces.com | ⚠️ | 部分可用 |
+| 7 | skillsmp.com | ❌ | Cloudflare保护 |
+| 8 | smithery.ai | ❌ | 限流严重 |
+| 9 | GitHub搜索 | ⭐ | **兜底**，避免同名混淆 |
 
 ### 自定义搜索顺序
 
 编辑 `~/.claude/skill-get-config.json`:
 \`\`\`json
 {
-  "marketplaces": ["skillsmp.com", "github.com/anthropics/skills", ...]
+  "marketplaces": ["github.com/anthropics/skills", "prompts.chat/skills", "skills.sh", ..., "github-search"]
 }
 \`\`\`
+
+> **建议**: 将 `github-search` 放在最后作为兜底。
 ```
 
 ### 示例3: 更新skill
