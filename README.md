@@ -26,6 +26,7 @@ Claude Code 扩展工具集，包含 Skills、Plugins 和 MCP Servers。
 |------|------|
 | github.com/anthropics/skills | 官方 Skill 仓库 |
 | skillsmp.com | 71000+ agent skills |
+| prompts.chat/skills | Prompts.chat Skills 目录 |
 | skillhub.club | 7000+ AI 评估的 Skills |
 | smithery.ai/skills | MCP 和 Skill 聚合 |
 | GitHub 搜索 | 按 Star 排序搜索公开仓库 |
@@ -45,6 +46,12 @@ skill-get 会按优先级在各来源搜索，找到后询问安装位置（项�
 用户: 安装 https://github.com/anthropics/skills 中的 docx
 ```
 
+**更新已安装的 Skill**
+```
+用户: 更新 playwright-testing
+```
+根据安装记录检查远程版本，如有更新则下载安装。
+
 **列出已安装的 Skills**
 ```
 用户: 列出已安装的 skills
@@ -61,9 +68,25 @@ skill-get 会按优先级在各来源搜索，找到后询问安装位置（项�
 用户: 解包 my-skill.skill 到 ~/.claude/skills/
 ```
 
-**查询支持的来源**
+**获取帮助**
 ```
-用户: 支持哪些 skill 来源？
+用户: skill-get help
+```
+显示支持的命令、搜索顺序和配置说明。
+
+#### 自定义搜索顺序
+
+编辑 `~/.claude/skill-get-config.json` 可自定义 marketplace 搜索优先级：
+
+```json
+{
+  "marketplaces": [
+    "github.com/anthropics/skills",
+    "prompts.chat/skills",
+    "skillsmp.com",
+    "skillhub.club"
+  ]
+}
 ```
 
 #### 安装位置

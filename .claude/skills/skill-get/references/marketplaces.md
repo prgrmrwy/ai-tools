@@ -84,7 +84,76 @@ curl -sL -A "Mozilla/5.0" "https://skillsmp.com/skills/{skill-name}" | \
   grep -oE '(npx skills add [^<"]+|github\.com/[^<"]+)' | head -5
 ```
 
-## 2. SkillHub (skillhub.club)
+## 2. Prompts.chat Skills (prompts.chat/skills)
+
+**特点**: Prompts.chat 的 Skills 目录，社区驱动，提供 MCP API
+
+**URL格式**:
+- 列表: `https://prompts.chat/skills`
+- 搜索: `https://prompts.chat/skills?q={keyword}`
+- 详情: `https://prompts.chat/prompts/{skill-id}`
+
+### 方法1: MCP API (推荐) ⭐
+
+prompts.chat 提供 MCP 服务器，支持通过 MCP 协议直接搜索和获取 skills。
+
+**MCP 服务器配置** (`.mcp.json`):
+```json
+{
+  "prompts.chat": {
+    "type": "http",
+    "url": "https://prompts.chat/api/mcp"
+  }
+}
+```
+
+**可用工具**:
+- `search_skills` - 搜索 skills
+  - `query`: 搜索关键词
+  - `limit`: 结果数量 (默认 10, 最大 50)
+  - `category`: 分类过滤 (如 "coding", "automation")
+  - `tag`: 标签过滤
+
+- `get_skill` - 获取完整 skill 内容
+  - `id`: skill ID
+  - 返回: 所有文件内容 (SKILL.md, scripts, configs 等)
+
+**参考实现**: https://github.com/f/awesome-chatgpt-prompts/tree/main/plugins/claude/prompts.chat/skills/skill-lookup
+
+### 方法2: HTTP API (备用)
+
+```bash
+# 搜索 skills
+curl -sL "https://prompts.chat/api/skills/search?q={keyword}&limit=10"
+
+# 获取 skill 详情和文件
+curl -sL "https://prompts.chat/api/skills/{skill-id}"
+```
+
+### 方法3: 页面抓取 (最后手段)
+
+```bash
+# 搜索 skill
+curl -sL -A "Mozilla/5.0" "https://prompts.chat/skills?q={keyword}" | \
+  grep -oE '/prompts/[a-zA-Z0-9_-]+' | head -10
+
+# 获取 skill 详情 (内容可能分块，不完整)
+curl -sL -A "Mozilla/5.0" "https://prompts.chat/prompts/{skill-id}"
+```
+
+### 安装流程
+
+1. 使用 MCP `get_skill(id)` 获取所有文件
+2. 创建目录 `.claude/skills/{slug}/`
+3. 保存每个文件:
+   - `SKILL.md` → `.claude/skills/{slug}/SKILL.md`
+   - 其他文件 → `.claude/skills/{slug}/{filename}`
+4. 创建 `.skill-meta.json` 记录安装信息
+
+**发现日期**: 2026-01-24
+**发现途径**: 参考 awesome-chatgpt-prompts 仓库的 Claude 插件实现
+
+## 3. SkillHub (skillhub.club)
 
 **特点**: 7000+ AI评估的Skills，提供Playground试用
 
@@ -98,7 +167,7 @@ curl -sL -A "Mozilla/5.0" "https://skillhub.club/skills/{skill-name}" | \
   grep -oE '(github\.com/[^<"]+|安装|install)[^<]*' | head -10
 ```
 
-## 3. Smithery (smithery.ai/skills)
+## 4. Smithery (smithery.ai/skills)
 
 **特点**: MCP和Skill聚合，支持创建自定义Skill
 
@@ -110,13 +179,13 @@ curl -sL -A "Mozilla/5.0" "https://smithery.ai/skills/{skill-name}" | \
   grep -oE '(npx [^<"]+|github\.com/[^<"]+)' | head -5
 ```
 
-## 4. mcpservers.org
+## 5. mcpservers.org
 
 **URL**: `https://mcpservers.org/claude-skills`
 
 **特点**: MCP与Skill整合目录
 
-## 5. claudemarketplaces.com
+## 6. claudemarketplaces.com
 
 **URL**: `https://claudemarketplaces.com`
 
@@ -153,18 +222,22 @@ gh api repos/anthropics/skills/contents/skills
 ```
 用户请求安装 "{skill-name}"
     │
-    ├─ 1. 检查官方仓库
+    ├─ 1. 检查官方仓库 (github.com/anthropics/skills)
     │     curl GitHub API → 找到? → git clone 安装
     │
     ├─ 2. 尝试 npx skills add (SkillsMP)
     │     npx skills add {skill-name} → 成功? → 完成
     │
-    ├─ 3. curl Marketplace 页面
+    ├─ 3. 搜索 prompts.chat/skills
+    │     curl 抓取 → 找到 GitHub 链接? → git clone 安装
+    │
+    ├─ 4. curl 其他 Marketplace 页面
+    │     skillhub.club / smithery.ai / mcpservers.org
     │     提取安装命令或 GitHub 链接 → 找到? → 执行安装
     │
-    ├─ 4. GitHub 搜索
+    ├─ 5. GitHub 搜索
     │     搜索 "claude skill {keyword}" → 找到? → git clone 安装
     │
-    └─ 5. 未找到
+    └─ 6. 未找到
           告知用户，建议检查 skill 名称或提供直接链接
 ```
