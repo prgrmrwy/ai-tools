@@ -1,84 +1,86 @@
-# 第三方 Skill Marketplace 参考
+# Third-Party Skill Marketplace Reference
 
-本文档提供第三方Marketplace的数据获取方法，**按搜索有效性和精准度排序**。
+This document provides data retrieval methods for third-party marketplaces, **sorted by search effectiveness and precision**.
 
-> **验证日期**: 2026-01-24
-> **验证方法**: 实际 HTTP/API 请求测试
+[中文文档](marketplaces_ZH_CN.md)
 
-## 搜索策略说明
+> **Validation Date**: 2026-01-24
+> **Validation Method**: Actual HTTP/API request testing
 
-**设计原则**: 优先从第三方 Marketplace 进行精准搜索，GitHub 搜索作为兜底能力放在最后，避免同名混淆。
+## Search Strategy
 
-## 搜索难度速查
+**Design Principle**: Prioritize precise searches from third-party marketplaces, with GitHub search as a fallback to avoid name collisions.
 
-| 优先级 | 来源 | 难度 | API可用 | 说明 |
-|--------|------|------|---------|------|
-| 1 | github.com/anthropics/skills | ⭐ 容易 | ✅ | 官方仓库，API稳定 |
-| 2 | prompts.chat/skills | ⭐⭐ 最佳 | ✅ MCP | MCP API，完整内容 |
-| 3 | skills.sh | ⭐⭐ 优秀 | ✅ REST | REST API + npx 安装 |
-| 4 | mcpservers.org/claude-skills | ⭐ 有效 | ❌ | 结构化URL，页面抓取 |
-| 5 | skillhub.club | ⭐ 有效 | ❌ | 分类浏览，页面抓取 |
-| 6 | claudemarketplaces.com | ⚠️ 部分 | ❌ | 首页可访问，/skills 404 |
-| 7 | skillsmp.com | ❌ 困难 | ❌ | Cloudflare 403 保护 |
-| 8 | smithery.ai | ❌ 最难 | ❌ | HTTP 429 限流/安全检查点 |
-| 9 | GitHub 搜索 | ⭐ 兜底 | ✅ | 放最后，避免同名混淆 |
+## Search Difficulty Quick Reference
+
+| Priority | Source | Difficulty | API Available | Description |
+|----------|--------|------------|---------------|-------------|
+| 1 | github.com/anthropics/skills | ⭐ Easy | ✅ | Official repository, stable API |
+| 2 | prompts.chat/skills | ⭐⭐ Best | ✅ MCP | MCP API, full content |
+| 3 | skills.sh | ⭐⭐ Excellent | ✅ REST | REST API + npx install |
+| 4 | mcpservers.org/claude-skills | ⭐ Effective | ❌ | Structured URL, page scraping |
+| 5 | skillhub.club | ⭐ Effective | ❌ | Category browsing, page scraping |
+| 6 | claudemarketplaces.com | ⚠️ Partial | ❌ | Homepage accessible, /skills 404 |
+| 7 | skillsmp.com | ❌ Difficult | ❌ | Cloudflare 403 protected |
+| 8 | smithery.ai | ❌ Hardest | ❌ | HTTP 429 rate limiting/security checkpoint |
+| 9 | GitHub Search | ⭐ Fallback | ✅ | Last resort, avoids name collision |
 
 ---
 
-## 1. 官方仓库 (github.com/anthropics/skills) ⭐ 官方
+## 1. Official Repository (github.com/anthropics/skills) ⭐ Official
 
-**特点**: Anthropic 官方 Skills 仓库，质量有保证
+**Features**: Anthropic official Skills repository, quality guaranteed
 
-**验证状态**: ✅ HTTP 200，API 稳定
+**Validation Status**: ✅ HTTP 200, stable API
 
-**当前 Skills** (2026-01-24):
+**Current Skills** (2026-01-24):
 - algorithmic-art, brand-guidelines, canvas-design, doc-coauthoring
 - docx, frontend-design, internal-comms, mcp-builder
 - pdf, pptx, skill-creator, slack-gif-creator
 - theme-factory, web-artifacts-builder, webapp-testing, xlsx
 
-**搜索方法**:
+**Search Method**:
 ```bash
-# 列出所有官方 skills
+# List all official skills
 curl -s "https://api.github.com/repos/anthropics/skills/contents/skills" | \
   jq -r '.[] | select(.type=="dir") | .name'
 
-# 搜索特定 skill
+# Search specific skill
 curl -s "https://api.github.com/repos/anthropics/skills/contents/skills" | \
   jq -r '.[] | select(.type=="dir") | .name' | grep -i "{keyword}"
 ```
 
-**安装方式**:
+**Installation**:
 ```bash
 scripts/install_skill.sh "https://github.com/anthropics/skills" ~/.claude/skills {skill-name}
 ```
 
 ---
 
-## 2. Prompts.chat Skills (prompts.chat/skills) ⭐⭐ 最佳
+## 2. Prompts.chat Skills (prompts.chat/skills) ⭐⭐ Best
 
-**特点**: 社区驱动的 Skills 目录，提供 MCP API，可获取完整文件内容
+**Features**: Community-driven Skills directory, provides MCP API with full file content retrieval
 
-**验证状态**: ✅ MCP API 正常工作，返回结构化 JSON
+**Validation Status**: ✅ MCP API working, returns structured JSON
 
-**URL格式**:
-- 列表: `https://prompts.chat/skills`
-- 搜索: `https://prompts.chat/skills?q={keyword}`
-- 详情: `https://prompts.chat/prompts/{skill-id}`
+**URL Formats**:
+- List: `https://prompts.chat/skills`
+- Search: `https://prompts.chat/skills?q={keyword}`
+- Details: `https://prompts.chat/prompts/{skill-id}`
 - MCP: `https://prompts.chat/api/mcp`
 
-### 方法1: MCP API (推荐) ⭐
+### Method 1: MCP API (Recommended) ⭐
 
-**直接调用 MCP 端点**:
+**Direct MCP endpoint call**:
 ```bash
-# 搜索 skills
+# Search skills
 curl -sL -X POST "https://prompts.chat/api/mcp" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"search_skills","arguments":{"query":"{skill-name}","limit":10}},"id":1}'
 ```
 
-**MCP 服务器配置** (`.mcp.json`):
+**MCP Server Configuration** (`.mcp.json`):
 ```json
 {
   "prompts.chat": {
@@ -88,55 +90,55 @@ curl -sL -X POST "https://prompts.chat/api/mcp" \
 }
 ```
 
-**可用工具**:
-- `search_skills` - 搜索 skills
-  - `query`: 搜索关键词
-  - `limit`: 结果数量 (默认 10, 最大 50)
-  - `category`: 分类过滤
-  - `tag`: 标签过滤
+**Available Tools**:
+- `search_skills` - Search skills
+  - `query`: Search keyword
+  - `limit`: Result count (default 10, max 50)
+  - `category`: Category filter
+  - `tag`: Tag filter
 
-- `get_skill` - 获取完整 skill 内容
+- `get_skill` - Get complete skill content
   - `id`: skill ID
-  - 返回: 所有文件内容 (SKILL.md, scripts, configs 等)
+  - Returns: All file contents (SKILL.md, scripts, configs, etc.)
 
-### 方法2: 页面抓取 (备用)
+### Method 2: Page Scraping (Backup)
 
 ```bash
 curl -sL -A "Mozilla/5.0" "https://prompts.chat/skills?q={keyword}" | \
   grep -oE '/prompts/[a-zA-Z0-9_-]+' | head -10
 ```
 
-### 安装流程
+### Installation Flow
 
-1. 调用 `search_skills(query)` 搜索
-2. 调用 `get_skill(id)` 获取所有文件
-3. 创建目录 `.claude/skills/{slug}/`
-4. 保存每个文件到对应位置
-5. 创建 `.skill-meta.json` 记录安装信息
+1. Call `search_skills(query)` to search
+2. Call `get_skill(id)` to get all files
+3. Create directory `.claude/skills/{slug}/`
+4. Save each file to corresponding location
+5. Create `.skill-meta.json` to record installation info
 
-**发现日期**: 2026-01-24
-**发现途径**: 参考 awesome-chatgpt-prompts 仓库的 Claude 插件实现
+**Discovery Date**: 2026-01-24
+**Discovery Method**: Referenced awesome-chatgpt-prompts repository Claude plugin implementation
 
 ---
 
-## 3. Skills.sh (skills.sh) ⭐⭐ 新发现
+## 3. Skills.sh (skills.sh) ⭐⭐ New Discovery
 
-**特点**: Vercel 官方维护的 Agent Skills 目录，提供 REST API 和 npx 安装命令
+**Features**: Vercel official Agent Skills directory, provides REST API and npx installation
 
-**验证状态**: ✅ REST API 正常，返回完整 skills 列表
+**Validation Status**: ✅ REST API working, returns complete skills list
 
-**URL格式**:
-- API 列表: `https://skills.sh/api/skills`
-- 页面: `https://skills.sh/{owner}/{repo}`
-- 文档: `https://skills.sh/docs`
+**URL Formats**:
+- API List: `https://skills.sh/api/skills`
+- Page: `https://skills.sh/{owner}/{repo}`
+- Docs: `https://skills.sh/docs`
 
 ### REST API
 
 ```bash
-# 获取 skills 列表 (按安装数排序)
+# Get skills list (sorted by installs)
 curl -sL "https://skills.sh/api/skills"
 
-# 返回格式示例:
+# Response format example:
 # {
 #   "skills": [
 #     {
@@ -153,95 +155,95 @@ curl -sL "https://skills.sh/api/skills"
 ### npx skills CLI
 
 ```bash
-# 安装 skill
+# Install skill
 npx skills add {owner}/{repo}
 npx skills add vercel-labs/agent-skills
 
-# 从 URL 安装
+# Install from URL
 npx skills add https://github.com/anthropics/skills
 
-# 检查更新
+# Check updates
 npx skills check
 
-# 更新所有
+# Update all
 npx skills update
 ```
 
-**安装位置**:
-- 默认: `.claude/skills/` (项目级)
-- 全局: `~/.claude/skills/` (使用 `--global` 或 `-g`)
+**Installation Locations**:
+- Default: `.claude/skills/` (project-level)
+- Global: `~/.claude/skills/` (use `--global` or `-g`)
 
-**热门 Skills** (2026-01-24 统计):
-- anti-slop (66003 安装)
-- vercel-react-best-practices (46196 安装)
-- web-design-guidelines (34563 安装)
-- frontend-design (11828 安装)
+**Popular Skills** (2026-01-24 stats):
+- anti-slop (66003 installs)
+- vercel-react-best-practices (46196 installs)
+- web-design-guidelines (34563 installs)
+- frontend-design (11828 installs)
 
-**发现日期**: 2026-01-24
-**发现途径**: npx skills --help 显示的 Discover URL
+**Discovery Date**: 2026-01-24
+**Discovery Method**: npx skills --help Discover URL
 
 ---
 
-## 4. mcpservers.org/claude-skills ⭐ 有效
+## 4. mcpservers.org/claude-skills ⭐ Effective
 
-**特点**: MCP 与 Skill 整合目录，有结构化的 URL 格式
+**Features**: MCP and Skill integrated directory with structured URL format
 
-**验证状态**: ✅ HTTP 200，页面可访问，有完整 skill 列表
+**Validation Status**: ✅ HTTP 200, page accessible, complete skill list
 
-**URL格式**:
-- 列表: `https://mcpservers.org/claude-skills`
-- 详情: `https://mcpservers.org/claude-skills/{owner}/{skill-name}`
-  - 例: `/claude-skills/anthropic/docx`
-  - 例: `/claude-skills/vercel/react-best-practices`
+**URL Formats**:
+- List: `https://mcpservers.org/claude-skills`
+- Details: `https://mcpservers.org/claude-skills/{owner}/{skill-name}`
+  - e.g.: `/claude-skills/anthropic/docx`
+  - e.g.: `/claude-skills/vercel/react-best-practices`
 
-**包含的 Skills** (部分):
+**Included Skills** (partial):
 - anthropic/frontend-design, anthropic/docx, anthropic/pdf
 - vercel/react-best-practices
 - notion/notion-knowledge-capture
 - cloudflare/building-ai-agent-on-cloudflare
 
-**数据获取**:
+**Data Retrieval**:
 ```bash
-# 获取 skills 列表
+# Get skills list
 curl -sL -A "Mozilla/5.0" "https://mcpservers.org/claude-skills" | \
   grep -oE 'href="/claude-skills/[^"]+' | head -20
 
-# 获取特定 skill 详情
+# Get specific skill details
 curl -sL -A "Mozilla/5.0" "https://mcpservers.org/claude-skills/{owner}/{skill}" | \
   grep -oE 'github\.com/[^"<>\s]+'
 ```
 
-**发现日期**: 2026-01-24
-**发现途径**: 验证测试时发现有结构化的 skills 路径
+**Discovery Date**: 2026-01-24
+**Discovery Method**: Found structured skills path during validation testing
 
 ---
 
-## 5. SkillHub (skillhub.club) ⭐ 有效
+## 5. SkillHub (skillhub.club) ⭐ Effective
 
-**特点**: 7000+ AI 评估的 Skills，提供分类浏览和 Playground 试用
+**Features**: 7000+ AI-evaluated Skills, category browsing and Playground trial
 
-**验证状态**: ✅ HTTP 200，首页和详情页可访问
+**Validation Status**: ✅ HTTP 200, homepage and detail pages accessible
 
-**URL格式**:
-- 列表: `https://skillhub.club/skills`
-- 详情: `https://skillhub.club/skills/{skill-slug}`
-- 分类: `https://skillhub.club/skills?category={category}`
-  - 分类: development, frontend, backend, data, ai-ml, productivity, writing
+**URL Formats**:
+- List: `https://skillhub.club/skills`
+- Details: `https://skillhub.club/skills/{skill-slug}`
+- Categories: `https://skillhub.club/skills?category={category}`
+  - Categories: development, frontend, backend, data, ai-ml, productivity, writing
 
-**注意**: 搜索页 `/search?q={keyword}` 返回 404，需要使用分类浏览或首页列表
+**Note**: Search page `/search?q={keyword}` returns 404, use category browsing or homepage list
 
-**数据获取**:
+**Data Retrieval**:
 ```bash
-# 获取首页 skill 列表
+# Get homepage skill list
 curl -sL -A "Mozilla/5.0" "https://skillhub.club" | \
   grep -oE 'href="/skills/[^"]+' | head -20
 
-# 获取详情页 (包含 GitHub 链接)
+# Get detail page (contains GitHub links)
 curl -sL -A "Mozilla/5.0" "https://skillhub.club/skills/{skill-slug}" | \
   grep -oE 'github\.com/[^"<>\s]+'
 ```
 
-**热门 Skills**:
+**Popular Skills**:
 - f-awesome-chatgpt-prompts-prompt-lookup
 - langgenius-dify-component-refactoring
 - oven-sh-bun-zig-system-calls
@@ -249,114 +251,114 @@ curl -sL -A "Mozilla/5.0" "https://skillhub.club/skills/{skill-slug}" | \
 
 ---
 
-## 6. claudemarketplaces.com ⚠️ 部分有效
+## 6. claudemarketplaces.com ⚠️ Partially Effective
 
-**特点**: Claude Code plugin marketplace 目录聚合
+**Features**: Claude Code plugin marketplace directory aggregator
 
-**验证状态**: ⚠️ 首页 HTTP 200，但 /skills 返回 404
+**Validation Status**: ⚠️ Homepage HTTP 200, but /skills returns 404
 
-**URL格式**: `https://claudemarketplaces.com`
+**URL Format**: `https://claudemarketplaces.com`
 
-**数据获取** (仅首页):
+**Data Retrieval** (homepage only):
 ```bash
 curl -sL -A "Mozilla/5.0" "https://claudemarketplaces.com" | \
   grep -oE 'github\.com/[a-zA-Z0-9_/-]+' | head -10
 ```
 
-**说明**: 该站点主要是聚合信息，实际搜索功能有限
+**Note**: This site mainly aggregates information, limited actual search functionality
 
 ---
 
-## 7. SkillsMP (skillsmp.com) ❌ Cloudflare 保护
+## 7. SkillsMP (skillsmp.com) ❌ Cloudflare Protected
 
-**特点**: 声称 71000+ agent skills，但有 Cloudflare 403 保护
+**Features**: Claims 71000+ agent skills, but Cloudflare 403 protected
 
-**验证状态**: ❌ 所有端点返回 HTTP 403 (Cloudflare Challenge)
+**Validation Status**: ❌ All endpoints return HTTP 403 (Cloudflare Challenge)
 
-**URL格式**:
-- 列表: `https://skillsmp.com/skills`
-- API: `https://skillsmp.com/api/skills` (也被保护)
+**URL Formats**:
+- List: `https://skillsmp.com/skills`
+- API: `https://skillsmp.com/api/skills` (also protected)
 
-**绕过策略** (效果有限):
+**Bypass Strategy** (limited effectiveness):
 ```bash
-# curl + User-Agent (仍然可能被拦截)
+# curl + User-Agent (may still be blocked)
 curl -sL -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
   "https://skillsmp.com/skills/{skill-name}"
 
-# 尝试提取 npx 命令
+# Try to extract npx command
 curl -sL -A "Mozilla/5.0" "https://skillsmp.com/skills/{skill-name}" | \
   grep -oE 'npx skills add [a-zA-Z0-9_-]+'
 ```
 
-**推荐方式**: 如果知道 skill 名称，直接使用 npx 安装
+**Recommended**: If skill name is known, install directly with npx
 ```bash
 npx skills add {skill-name}
 ```
 
 ---
 
-## 8. Smithery (smithery.ai) ❌ 限流严重
+## 8. Smithery (smithery.ai) ❌ Heavy Rate Limiting
 
-**特点**: MCP 和 Skill 聚合，支持创建自定义 Skill
+**Features**: MCP and Skill aggregator, supports custom Skill creation
 
-**验证状态**: ❌ HTTP 429 限流 + Vercel 安全检查点
+**Validation Status**: ❌ HTTP 429 rate limiting + Vercel security checkpoint
 
-**URL格式**: `https://smithery.ai/skills?q={keyword}`
+**URL Format**: `https://smithery.ai/skills?q={keyword}`
 
-**说明**: 该站点限流严重，经常返回 429 或安全检查页面，不推荐作为主要搜索来源
+**Note**: This site has severe rate limiting, frequently returns 429 or security check pages, not recommended as primary search source
 
 ---
 
-## 9. GitHub 搜索 ⭐ 兜底
+## 9. GitHub Search ⭐ Fallback
 
-**特点**: 最大的代码托管平台，作为兜底搜索能力
+**Features**: Largest code hosting platform, used as fallback search capability
 
-**验证状态**: ✅ API 稳定
+**Validation Status**: ✅ API stable
 
-**为什么放最后**:
-1. 搜索结果可能包含大量不相关项目
-2. 同名项目多，容易混淆
-3. 需要额外筛选才能找到真正的 Claude Skills
-4. 优先使用第三方 Marketplace 获得更精准的结果
+**Why Last**:
+1. Search results may contain many irrelevant projects
+2. Many projects with same name, easy to confuse
+3. Requires extra filtering to find actual Claude Skills
+4. Prioritize third-party marketplaces for more precise results
 
-**搜索方法**:
+**Search Method**:
 ```bash
-# 搜索 claude skill 仓库
+# Search claude skill repositories
 curl -s "https://api.github.com/search/repositories?q=claude+skill+{keyword}&sort=stars&order=desc&per_page=5" | \
   jq -r '.items[] | "- \(.full_name) (⭐\(.stargazers_count))\n  \(.html_url)"'
 
-# 使用 gh CLI
+# Use gh CLI
 gh search repos "claude skill {keyword}" --sort stars --limit 10
 ```
 
-**筛选建议**:
-- 优先选择星标数高的仓库
-- 检查是否包含 SKILL.md 文件
-- 查看仓库描述是否明确提及 Claude Code Skills
+**Filtering Suggestions**:
+- Prioritize repositories with high star counts
+- Check if SKILL.md file exists
+- Review repository description for explicit Claude Code Skills mention
 
 ---
 
-## Cloudflare 保护应对策略
+## Cloudflare Protection Strategies
 
-许多 Marketplace 使用 Cloudflare 保护，以下是通用应对策略：
+Many marketplaces use Cloudflare protection, here are general strategies:
 
-### 策略1: curl + 完整 User-Agent
+### Strategy 1: curl + Full User-Agent
 
 ```bash
 curl -sL -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
   "{url}" 2>/dev/null
 ```
 
-### 策略2: 直接使用 npx/CLI 工具
+### Strategy 2: Use npx/CLI Tools Directly
 
-很多平台提供 CLI 工具，可以绕过网页保护：
+Many platforms provide CLI tools that bypass web protection:
 ```bash
 npx skills add {skill-name}
 ```
 
-### 策略3: 使用 MCP API
+### Strategy 3: Use MCP API
 
-部分平台提供 MCP API，可以直接调用：
+Some platforms provide MCP API, call directly:
 ```bash
 curl -sL -X POST "{mcp-endpoint}" \
   -H "Content-Type: application/json" \
@@ -365,75 +367,75 @@ curl -sL -X POST "{mcp-endpoint}" \
 
 ---
 
-## 安装流程决策树（按有效性排序）
+## Installation Flow Decision Tree (sorted by effectiveness)
 
 ```
-用户请求安装 "{skill-name}"
+User requests install "{skill-name}"
     │
-    ├─ 1. ⭐ 检查官方仓库 (github.com/anthropics/skills)
-    │     curl GitHub API → 找到? → git clone 安装
+    ├─ 1. ⭐ Check official repository (github.com/anthropics/skills)
+    │     curl GitHub API → Found? → git clone install
     │
-    ├─ 2. ⭐⭐ prompts.chat MCP API (最佳)
-    │     MCP search_skills → 找到? → get_skill 获取文件 → 安装
+    ├─ 2. ⭐⭐ prompts.chat MCP API (Best)
+    │     MCP search_skills → Found? → get_skill files → install
     │
     ├─ 3. ⭐⭐ skills.sh REST API
-    │     curl API → 找到? → npx skills add 安装
+    │     curl API → Found? → npx skills add install
     │
     ├─ 4. ⭐ mcpservers.org/claude-skills
-    │     页面抓取 → 找到? → 获取 GitHub 链接 → git clone
+    │     Page scraping → Found? → Get GitHub link → git clone
     │
     ├─ 5. ⭐ skillhub.club
-    │     分类浏览 → 找到? → 获取 GitHub 链接 → git clone
+    │     Category browsing → Found? → Get GitHub link → git clone
     │
     ├─ 6. ⚠️ claudemarketplaces.com
-    │     首页抓取 → 找到 GitHub 链接? → git clone
+    │     Homepage scraping → Found GitHub link? → git clone
     │
-    ├─ 7. ❌ skillsmp.com (Cloudflare 保护)
-    │     npx skills add {skill-name} → 成功? → 完成
+    ├─ 7. ❌ skillsmp.com (Cloudflare protected)
+    │     npx skills add {skill-name} → Success? → Done
     │
-    ├─ 8. ❌ smithery.ai (限流严重)
-    │     可能被 429 限流，跳过或重试
+    ├─ 8. ❌ smithery.ai (Heavy rate limiting)
+    │     May be 429 rate limited, skip or retry
     │
-    ├─ 9. ⭐ GitHub 搜索 (兜底)
-    │     搜索 "claude skill {keyword}" → 筛选结果 → git clone
+    ├─ 9. ⭐ GitHub Search (Fallback)
+    │     Search "claude skill {keyword}" → Filter results → git clone
     │
-    └─ 10. 未找到
-          告知用户，建议检查 skill 名称或提供直接链接
+    └─ 10. Not found
+          Inform user, suggest checking skill name or provide direct link
 ```
 
 ---
 
-## 常见安装命令格式
+## Common Installation Command Formats
 
-| 平台 | 安装命令格式 |
-|------|-------------|
+| Platform | Installation Command |
+|----------|---------------------|
 | skills.sh | `npx skills add {owner}/{repo}` |
 | SkillsMP | `npx skills add {skill-name}` |
-| 直接 GitHub | `git clone` 后复制到 skills 目录 |
+| Direct GitHub | `git clone` then copy to skills directory |
 
-### npx skills add 工作原理
+### npx skills add Explained
 
 ```bash
-# 从 GitHub 仓库安装
+# Install from GitHub repository
 npx skills add vercel-labs/agent-skills
 
-# 从 URL 安装
+# Install from URL
 npx skills add https://github.com/anthropics/skills
 
-# 全局安装
+# Global install
 npx skills add {source} --global
 ```
 
 ---
 
-## 更新日志
+## Changelog
 
-### 2026-01-24 验证更新
+### 2026-01-24 Validation Update
 
-1. **新增 skills.sh** - Vercel 官方维护，REST API 可用
-2. **验证 prompts.chat MCP API** - 完全可用，返回结构化数据
-3. **验证 mcpservers.org** - 发现结构化 skills 目录
-4. **验证 skillhub.club** - 首页和详情页可用，搜索 404
-5. **确认 skillsmp.com** - Cloudflare 全保护
-6. **确认 smithery.ai** - 429 限流 + 安全检查点
-7. **调整 GitHub 搜索** - 移至最后作为兜底，避免同名混淆
+1. **Added skills.sh** - Vercel official, REST API available
+2. **Validated prompts.chat MCP API** - Fully functional, returns structured data
+3. **Validated mcpservers.org** - Found structured skills directory
+4. **Validated skillhub.club** - Homepage and detail pages work, search 404
+5. **Confirmed skillsmp.com** - Full Cloudflare protection
+6. **Confirmed smithery.ai** - 429 rate limiting + security checkpoint
+7. **Adjusted GitHub Search** - Moved to last as fallback, avoids name collision
