@@ -23,6 +23,16 @@ Custom skills that extend Claude Code's command capabilities.
 
 A unified skill installer supporting multiple sources.
 
+#### Quick Install
+
+```bash
+# Install to current project (recommended)
+npx @prgrmrwy/install-skill-get
+
+# Or install to user level
+npx @prgrmrwy/install-skill-get --global
+```
+
 > **Design Principle**: Prioritize precise searches from third-party marketplaces, with GitHub search as a fallback to avoid name collisions.
 
 #### Supported Data Sources (by search priority)

@@ -23,6 +23,16 @@ Claude Code 扩展工具集，包含 Skills、Plugins 和 MCP Servers。
 
 统一的 Skill 安装器，支持多种来源。
 
+#### 快速安装
+
+```bash
+# 安装到当前项目（推荐）
+npx @prgrmrwy/install-skill-get
+
+# 或安装到用户级别
+npx @prgrmrwy/install-skill-get --global
+```
+
 > **设计原则**: 优先从第三方 Marketplace 进行精准搜索，GitHub 搜索作为兜底能力放在最后，避免同名混淆。
 
 #### 支持的数据源（按搜索优先级排序）
