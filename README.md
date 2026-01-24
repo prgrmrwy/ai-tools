@@ -9,7 +9,6 @@ Claude Code 扩展工具集，包含 Skills、Plugins 和 MCP Servers。
 ├── skills/           # Claude Code Skills
 ├── plugins/          # Claude Code Plugins
 ├── mcp-servers/      # MCP (Model Context Protocol) Servers
-└── skill-get.skill   # skill-get 的可分发打包文件
 ```
 
 ## Skills
@@ -20,18 +19,27 @@ Claude Code 扩展工具集，包含 Skills、Plugins 和 MCP Servers。
 
 **一句话从任意来源安装 Skill 到本地。**
 
-统一的 Skill 安装器，支持多种来源：
+统一的 Skill 安装器，支持多种来源。
 
-| 来源 | 说明 |
-|------|------|
-| github.com/anthropics/skills | 官方 Skill 仓库 |
-| skillsmp.com | 71000+ agent skills |
-| prompts.chat/skills | Prompts.chat Skills 目录 |
-| skillhub.club | 7000+ AI 评估的 Skills |
-| smithery.ai/skills | MCP 和 Skill 聚合 |
-| GitHub 搜索 | 按 Star 排序搜索公开仓库 |
-| 直接 Git/HTTP URL | 用户提供完整地址 |
-| 本地路径 | 复制本地文件夹 |
+> **设计原则**: 优先从第三方 Marketplace 进行精准搜索，GitHub 搜索作为兜底能力放在最后，避免同名混淆。
+
+#### 支持的数据源（按搜索优先级排序）
+
+| 优先级 | 来源 | 有效性 | 说明 |
+|--------|------|--------|------|
+| 1 | github.com/anthropics/skills | ⭐ 官方 | 官方 Skill 仓库，API 稳定 |
+| 2 | prompts.chat/skills | ⭐⭐ 最佳 | MCP API，可获取完整内容 |
+| 3 | skills.sh | ⭐⭐ 优秀 | Vercel 官方，REST API + npx |
+| 4 | mcpservers.org/claude-skills | ⭐ 有效 | 结构化目录，页面抓取 |
+| 5 | skillhub.club | ⭐ 有效 | 7000+ AI 评估的 Skills |
+| 6 | claudemarketplaces.com | ⚠️ 部分 | 首页可访问 |
+| 7 | skillsmp.com | ❌ 困难 | Cloudflare 保护，需 npx |
+| 8 | smithery.ai/skills | ❌ 最难 | HTTP 429 限流严重 |
+| 9 | GitHub 搜索 | ⭐ 兜底 | **放最后**，避免同名混淆 |
+| - | 直接 Git/HTTP URL | - | 用户提供完整地址 |
+| - | 本地路径 | - | 复制本地文件夹 |
+
+> 数据源验证日期: 2026-01-24
 
 #### 用法示例
 
@@ -39,7 +47,7 @@ Claude Code 扩展工具集，包含 Skills、Plugins 和 MCP Servers。
 ```
 用户: 安装 playwright-testing
 ```
-skill-get 会按优先级在各来源搜索，找到后询问安装位置（项目级或用户级）。
+skill-get 会按优先级在 9 个来源中搜索，找到后询问安装位置（项目级或用户级）。
 
 **从指定地址安装**
 ```
@@ -83,11 +91,18 @@ skill-get 会按优先级在各来源搜索，找到后询问安装位置（项�
   "marketplaces": [
     "github.com/anthropics/skills",
     "prompts.chat/skills",
+    "skills.sh",
+    "mcpservers.org/claude-skills",
+    "skillhub.club",
+    "claudemarketplaces.com",
     "skillsmp.com",
-    "skillhub.club"
+    "smithery.ai/skills",
+    "github-search"
   ]
 }
 ```
+
+> **建议**: 将 `github-search` 放在最后作为兜底，避免同名项目混淆。
 
 #### 安装位置
 
