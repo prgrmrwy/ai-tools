@@ -1,202 +1,204 @@
 ---
 name: skill-get
-description: 从多种来源安装Claude Code Skills的统一安装器。当用户请求安装skill、查找skill、列出已安装skills、更新skill、查询支持哪些marketplace/来源、skill-get help、打包skill、编译skill、或提到skill名称/URL时触发。支持：(1)官方仓库 github.com/anthropics/skills，(2)第三方Marketplace（skillsmp.com、prompts.chat、skillhub.club、smithery.ai等），(3)GitHub搜索，(4)直接Git/HTTP URL，(5)本地路径，(6)打包skill为.skill文件，(7)更新已安装的skill。
+description: Unified installer for Claude Code Skills from multiple sources. Triggered when users request to install skills, search for skills, list installed skills, update skills, query supported marketplaces/sources, skill-get help, package skills, compile skills, or mention skill names/URLs. Supports: (1) Official repository github.com/anthropics/skills, (2) Third-party marketplaces (skillsmp.com, prompts.chat, skillhub.club, smithery.ai, etc.), (3) GitHub search, (4) Direct Git/HTTP URLs, (5) Local paths, (6) Packaging skills as .skill files, (7) Updating installed skills.
 ---
 
 # Skill Get
 
-一句话从任意来源安装Skill到本地。
+Install skills from any source with a single command.
 
-## 安装位置
+[中文文档](SKILL_ZH_CN.md)
 
-| 类型 | 路径 | 说明 |
-|------|------|------|
-| 用户级 | `~/.claude/skills/` | 所有项目可用 |
-| 项目级 | `.claude/skills/` | 仅当前项目可用 |
+## Installation Locations
 
-默认询问用户选择安装位置。
+| Type | Path | Description |
+|------|------|-------------|
+| User-level | `~/.claude/skills/` | Available to all projects |
+| Project-level | `.claude/skills/` | Only for current project |
 
-## 工作流程
+Prompts user to choose installation location by default.
 
-### 场景A: 用户给出明确地址
+## Workflows
 
-直接执行安装：
+### Scenario A: User provides explicit address
+
+Execute installation directly:
 
 ```bash
-# Git仓库
+# Git repository
 scripts/install_skill.sh "https://github.com/anthropics/skills" ~/.claude/skills docx
 
-# HTTP URL（SKILL.md）
+# HTTP URL (SKILL.md)
 scripts/install_skill.sh "https://example.com/skill/SKILL.md" ~/.claude/skills/my-skill
 
-# 本地路径
+# Local path
 scripts/install_skill.sh /path/to/skill ~/.claude/skills
 ```
 
-### 场景B: 用户只给Skill名称
+### Scenario B: User provides only skill name
 
-按优先级搜索并安装。
+Search and install by priority.
 
-#### ⚠️ 搜索约束（必须遵守）
+#### ⚠️ Search Constraints (must follow)
 
-1. **严格按优先级顺序搜索**：必须从优先级 1 开始，依次搜索到优先级 9，不可跳跃
-2. **禁止跳过任何来源**：即使某个来源很可能没有结果，也必须执行搜索
-3. **实时显示搜索进度**：每搜索一个来源，必须向用户显示当前正在搜索的来源名称
-4. **找到即停止**：一旦在某个来源找到匹配结果，立即停止搜索并展示结果
-5. **全部搜索完才报未找到**：只有当所有 9 个来源都搜索完毕且无结果时，才能报告"未找到"
-6. **GitHub 搜索兜底**：GitHub 搜索放在最后（第 9 步），优先从第三方 Marketplace 获取精准结果
+1. **Search strictly in priority order**: Must search from priority 1 through 9 in sequence, no skipping
+2. **Never skip any source**: Even if a source is unlikely to have results, must execute the search
+3. **Show search progress in real-time**: Display the current source name being searched to the user
+4. **Stop on first match**: Once a match is found in any source, stop searching and show results
+5. **Report "not found" only after all searches**: Only report "not found" after all 9 sources have been searched
+6. **GitHub search as fallback**: GitHub search is last (step 9), prioritize third-party marketplaces for precise results
 
-#### 搜索进度显示格式
+#### Search Progress Display Format
 
 ```
-🔍 正在搜索 "skill-name"...
+🔍 Searching for "skill-name"...
 
-[1/9] 搜索 github.com/anthropics/skills ... ❌ 未找到
-[2/9] 搜索 prompts.chat (MCP API) ... ✅ 找到匹配！
+[1/9] Searching github.com/anthropics/skills ... ❌ Not found
+[2/9] Searching prompts.chat (MCP API) ... ✅ Match found!
 ```
 
-> **注意**: GitHub 搜索放在第 9 步（最后）作为兜底，避免同名混淆。
+> **Note**: GitHub search is at step 9 (last) as a fallback to avoid name collisions.
 
-#### 搜索步骤（按有效性排序，GitHub搜索兜底）
+#### Search Steps (sorted by effectiveness, GitHub as fallback)
 
-> **设计原则**: 优先从第三方 Marketplace 进行精准搜索，GitHub 搜索作为兜底能力放在最后，避免同名混淆。
+> **Design Principle**: Prioritize precise searches from third-party marketplaces, with GitHub search as a fallback to avoid name collisions.
 
-**Step 1/9: 官方仓库 (github.com/anthropics/skills)** ⭐ 官方优先
+**Step 1/9: Official Repository (github.com/anthropics/skills)** ⭐ Official priority
 ```bash
-echo "[1/9] 搜索 github.com/anthropics/skills ..."
+echo "[1/9] Searching github.com/anthropics/skills ..."
 curl -s "https://api.github.com/repos/anthropics/skills/contents/skills" | jq -r '.[] | select(.type=="dir") | .name' | grep -i "{keyword}"
 ```
 
-**Step 2/9: Prompts.chat Skills (prompts.chat/skills)** ⭐⭐ MCP API最佳
+**Step 2/9: Prompts.chat Skills (prompts.chat/skills)** ⭐⭐ Best MCP API
 
-prompts.chat 提供 MCP API，**优先使用 MCP 工具**：
+prompts.chat provides MCP API, **prioritize using MCP tools**:
 
-**方法1: MCP API (推荐)**
+**Method 1: MCP API (Recommended)**
 
-直接调用 MCP 端点：
+Call MCP endpoint directly:
 ```bash
-echo "[2/9] 搜索 prompts.chat (MCP API) ..."
+echo "[2/9] Searching prompts.chat (MCP API) ..."
 curl -sL -X POST "https://prompts.chat/api/mcp" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"search_skills","arguments":{"query":"{skill-name}","limit":10}},"id":1}'
 ```
 
-如果 MCP 服务器已配置 (`prompts.chat: https://prompts.chat/api/mcp`)，使用：
-- `search_skills` - 搜索 skills
-- `get_skill` - 获取完整 skill 内容（包括所有文件）
+If MCP server is configured (`prompts.chat: https://prompts.chat/api/mcp`), use:
+- `search_skills` - Search skills
+- `get_skill` - Get complete skill content (including all files)
 
 ```
-# 搜索
+# Search
 search_skills(query="{skill-name}", limit=10)
 
-# 获取完整内容
+# Get complete content
 get_skill(id="{skill-id}")
 ```
 
-**方法2: 页面抓取 (备用)**
+**Method 2: Page Scraping (Backup)**
 ```bash
 curl -sL -A "Mozilla/5.0" "https://prompts.chat/skills?q={skill-name}" | grep -oE '/prompts/[a-zA-Z0-9_-]+'
 ```
 
-**安装流程**:
-1. 调用 `get_skill(id)` 获取所有文件内容
-2. 创建目录 `.claude/skills/{slug}/`
-3. 保存 SKILL.md 和其他文件到对应位置
+**Installation Flow**:
+1. Call `get_skill(id)` to get all file contents
+2. Create directory `.claude/skills/{slug}/`
+3. Save SKILL.md and other files to corresponding locations
 
 **Step 3/9: Skills.sh (skills.sh)** ⭐⭐ REST API + npx
 
-Vercel 官方维护的 Agent Skills 目录：
+Vercel official Agent Skills directory:
 ```bash
-echo "[3/9] 搜索 skills.sh ..."
-# REST API 获取 skills 列表
+echo "[3/9] Searching skills.sh ..."
+# REST API to get skills list
 curl -sL "https://skills.sh/api/skills" | jq -r '.skills[] | select(.name | test("{keyword}"; "i")) | "\(.name) (⭐\(.installs)) - \(.topSource)"'
 ```
 
-**安装方式**:
+**Installation**:
 ```bash
 npx skills add {owner}/{repo}
 npx skills add vercel-labs/agent-skills
 ```
 
-**Step 4/9: mcpservers.org/claude-skills** ⭐ 结构化目录
+**Step 4/9: mcpservers.org/claude-skills** ⭐ Structured directory
 ```bash
-echo "[4/9] 搜索 mcpservers.org/claude-skills ..."
+echo "[4/9] Searching mcpservers.org/claude-skills ..."
 curl -sL -A "Mozilla/5.0" "https://mcpservers.org/claude-skills" | grep -oE 'href="/claude-skills/[^"]+' | grep -i "{keyword}"
 ```
 
-**Step 5/9: SkillHub (skillhub.club)** ⭐ 分类浏览
+**Step 5/9: SkillHub (skillhub.club)** ⭐ Category browsing
 ```bash
-echo "[5/9] 搜索 skillhub.club ..."
+echo "[5/9] Searching skillhub.club ..."
 curl -sL -A "Mozilla/5.0" "https://skillhub.club" | grep -oE 'href="/skills/[^"]+' | grep -i "{keyword}"
 ```
 
-**Step 6/9: Claude Marketplaces (claudemarketplaces.com)** ⚠️ 部分可用
+**Step 6/9: Claude Marketplaces (claudemarketplaces.com)** ⚠️ Partially available
 ```bash
-echo "[6/9] 搜索 claudemarketplaces.com ..."
+echo "[6/9] Searching claudemarketplaces.com ..."
 curl -sL -A "Mozilla/5.0" "https://claudemarketplaces.com" | grep -oE 'github\.com/[a-zA-Z0-9_/-]+'
 ```
 
-**Step 7/9: SkillsMP (skillsmp.com)** ❌ Cloudflare保护
+**Step 7/9: SkillsMP (skillsmp.com)** ❌ Cloudflare protected
 
-Cloudflare 403 保护，优先使用 npx 直接安装：
+Cloudflare 403 protected, prioritize direct npx installation:
 ```bash
-echo "[7/9] 搜索 skillsmp.com ..."
-# 直接尝试 npx 安装（无需搜索）
+echo "[7/9] Searching skillsmp.com ..."
+# Try npx installation directly (no search needed)
 npx skills add {skill-name}
 
-# 或 curl 探测（可能被拦截）
+# Or curl probe (may be blocked)
 curl -sL -A "Mozilla/5.0" "https://skillsmp.com/skills/{skill-name}" | grep -oE 'npx skills add [a-zA-Z0-9_-]+'
 ```
 
-**Step 8/9: Smithery (smithery.ai/skills)** ❌ 限流严重
+**Step 8/9: Smithery (smithery.ai/skills)** ❌ Heavy rate limiting
 ```bash
-echo "[8/9] 搜索 smithery.ai/skills ..."
-# 注意: 该站点 HTTP 429 限流严重，可能失败
+echo "[8/9] Searching smithery.ai/skills ..."
+# Note: This site has severe HTTP 429 rate limiting, may fail
 curl -sL -A "Mozilla/5.0" "https://smithery.ai/skills/{skill-name}" | grep -oE 'github\.com/[a-zA-Z0-9_/-]+'
 ```
 
-**Step 9/9: GitHub 搜索 (兜底)** ⭐ 最后搜索，避免同名混淆
+**Step 9/9: GitHub Search (Fallback)** ⭐ Last search, avoids name collision
 ```bash
-echo "[9/9] 搜索 GitHub (兜底) ..."
+echo "[9/9] Searching GitHub (fallback) ..."
 curl -s "https://api.github.com/search/repositories?q=claude+skill+{keyword}&sort=stars&per_page=5" | jq -r '.items[] | "\(.full_name) ⭐\(.stargazers_count)"'
 ```
 
-> **说明**: GitHub 搜索放在最后是因为搜索结果可能包含大量不相关项目，容易出现同名混淆。优先从第三方 Marketplace 搜索可以获得更精准的结果。
+> **Note**: GitHub search is last because search results may contain many irrelevant projects with name collisions. Searching third-party marketplaces first yields more precise results.
 
-详见 [references/marketplaces.md](references/marketplaces.md)
+See [references/marketplaces.md](references/marketplaces.md) for details.
 
-找到后展示结果，确认后安装。
+Show results after finding, confirm before installing.
 
-### 场景C: 列出已安装Skills
+### Scenario C: List Installed Skills
 
 ```bash
 scripts/list_skills.sh
 ```
 
-### 场景D: 查询支持的Marketplace / skill-get help
+### Scenario D: Query Supported Marketplaces / skill-get help
 
-当用户问"支持哪些marketplace"、"有哪些skill来源"、"skill-get help"等问题时，展示支持的来源列表和配置说明：
+When user asks "which marketplaces are supported", "what skill sources exist", "skill-get help", etc., show supported sources list and configuration:
 
-#### 默认搜索顺序（按有效性排序，GitHub搜索兜底）
+#### Default Search Order (sorted by effectiveness, GitHub as fallback)
 
-| 优先级 | 来源 | 有效性 | 说明 |
-|--------|------|--------|------|
-| 1 | github.com/anthropics/skills | ⭐ 官方 | 官方Skill仓库，API稳定 |
-| 2 | prompts.chat/skills | ⭐⭐ 最佳 | MCP API，可获取完整内容 |
-| 3 | skills.sh | ⭐⭐ 优秀 | Vercel官方，REST API + npx |
-| 4 | mcpservers.org/claude-skills | ⭐ 有效 | 结构化目录，页面抓取 |
-| 5 | skillhub.club | ⭐ 有效 | 分类浏览，页面抓取 |
-| 6 | claudemarketplaces.com | ⚠️ 部分 | 首页可访问，/skills 404 |
-| 7 | skillsmp.com | ❌ 困难 | Cloudflare 403保护，需npx |
-| 8 | smithery.ai/skills | ❌ 最难 | HTTP 429限流严重 |
-| 9 | GitHub搜索 | ⭐ 兜底 | **放最后**，避免同名混淆 |
-| - | 直接Git/HTTP URL | - | 用户提供完整地址 |
-| - | 本地路径 | - | 复制本地文件夹 |
+| Priority | Source | Effectiveness | Description |
+|----------|--------|---------------|-------------|
+| 1 | github.com/anthropics/skills | ⭐ Official | Official skill repository, stable API |
+| 2 | prompts.chat/skills | ⭐⭐ Best | MCP API, full content retrieval |
+| 3 | skills.sh | ⭐⭐ Excellent | Vercel official, REST API + npx |
+| 4 | mcpservers.org/claude-skills | ⭐ Effective | Structured directory, page scraping |
+| 5 | skillhub.club | ⭐ Effective | Category browsing, page scraping |
+| 6 | claudemarketplaces.com | ⚠️ Partial | Homepage accessible, /skills 404 |
+| 7 | skillsmp.com | ❌ Difficult | Cloudflare 403 protected, requires npx |
+| 8 | smithery.ai/skills | ❌ Hardest | HTTP 429 rate limiting |
+| 9 | GitHub Search | ⭐ Fallback | **Last**, avoids name collision |
+| - | Direct Git/HTTP URL | - | User provides full address |
+| - | Local path | - | Copy local folder |
 
-#### 自定义搜索顺序
+#### Custom Search Order
 
-用户可以在 `~/.claude/skill-get-config.json` 中自定义 marketplace 搜索顺序：
+Users can customize marketplace search order in `~/.claude/skill-get-config.json`:
 
 ```json
 {
@@ -214,28 +216,28 @@ scripts/list_skills.sh
 }
 ```
 
-> **注意**: `github-search` 放在最后作为兜底能力。
+> **Note**: `github-search` should be last as a fallback.
 
-**说明**：
-- 数组顺序决定搜索优先级
-- 移除某项则跳过该来源
-- `github-search` 代表 GitHub 公开仓库搜索
-- 直接 URL 和本地路径始终支持，无需配置
+**Notes**:
+- Array order determines search priority
+- Remove an item to skip that source
+- `github-search` represents GitHub public repository search
+- Direct URLs and local paths are always supported, no configuration needed
 
-读取配置：
+Read configuration:
 ```bash
-cat ~/.claude/skill-get-config.json 2>/dev/null || echo "使用默认配置"
+cat ~/.claude/skill-get-config.json 2>/dev/null || echo "Using default configuration"
 ```
 
-### 场景E: 更新Skill (update)
+### Scenario E: Update Skill
 
-当用户说"更新skill"、"update skill"、"升级skill"等，根据安装记录检查并更新指定skill。
+When user says "update skill", "upgrade skill", etc., check and update specified skill based on installation record.
 
-**重要**: 用户 **必须** 指定要更新的 skill 名称。
+**Important**: User **must** specify the skill name to update.
 
-#### 安装记录文件
+#### Installation Record File
 
-安装 skill 时，自动在安装目录生成 `.skill-meta.json` 记录安装信息：
+When installing a skill, automatically generate `.skill-meta.json` in the installation directory:
 
 ```json
 {
@@ -252,95 +254,95 @@ cat ~/.claude/skill-get-config.json 2>/dev/null || echo "使用默认配置"
 }
 ```
 
-**来源类型**：
-- `git`: Git 仓库，记录 commit hash
-- `npm`: npx 安装，记录版本号
-- `http`: HTTP URL，记录 ETag 或 Last-Modified
-- `local`: 本地路径，记录文件修改时间
+**Source types**:
+- `git`: Git repository, records commit hash
+- `npm`: npx installation, records version number
+- `http`: HTTP URL, records ETag or Last-Modified
+- `local`: Local path, records file modification time
 
-#### 更新流程
+#### Update Flow
 
 ```bash
-# 用户必须指定 skill 名称
-用户: 更新 playwright-testing
+# User must specify skill name
+User: update playwright-testing
 ```
 
-**Step 1**: 读取安装记录
+**Step 1**: Read installation record
 ```bash
 cat ~/.claude/skills/playwright-testing/.skill-meta.json
-# 或
+# or
 cat .claude/skills/playwright-testing/.skill-meta.json
 ```
 
-**Step 2**: 检查远程版本
+**Step 2**: Check remote version
 ```bash
-# Git 仓库：获取最新 commit
+# Git repository: get latest commit
 git ls-remote {url} {branch} | cut -f1
 
-# npm：检查最新版本
+# npm: check latest version
 npm view {package-name} version
 ```
 
-**Step 3**: 对比版本
-- 如果远程 commit/version 与本地记录一致：提示 "已是最新版本"
-- 如果不一致：显示更新内容，确认后执行更新
+**Step 3**: Compare versions
+- If remote commit/version matches local record: prompt "Already up to date"
+- If different: show update content, confirm before updating
 
-**Step 4**: 执行更新
+**Step 4**: Execute update
 ```bash
-# 备份当前版本（可选）
+# Backup current version (optional)
 cp -r {skill-path} {skill-path}.bak
 
-# 重新安装
+# Reinstall
 scripts/install_skill.sh {source-url} {install-path} {skill-name}
 
-# 更新记录文件中的 commit/version
+# Update commit/version in record file
 ```
 
-#### 批量检查更新
+#### Batch Update Check
 
 ```bash
-# 列出所有可更新的 skills
-用户: 检查所有 skill 更新
+# List all updatable skills
+User: check all skill updates
 
-AI: 检查已安装的 skills...
+AI: Checking installed skills...
 
-| Skill | 当前版本 | 最新版本 | 状态 |
-|-------|----------|----------|------|
-| playwright-testing | abc1234 | def5678 | 可更新 |
-| docx-converter | v1.0.0 | v1.0.0 | 已最新 |
-| my-local-skill | - | - | 本地安装，跳过 |
+| Skill | Current Version | Latest Version | Status |
+|-------|-----------------|----------------|--------|
+| playwright-testing | abc1234 | def5678 | Updatable |
+| docx-converter | v1.0.0 | v1.0.0 | Up to date |
+| my-local-skill | - | - | Local install, skip |
 ```
 
-### 场景F: 打包Skill
+### Scenario F: Package Skill
 
-当用户说"打包skill"、"编译skill"、"生成.skill文件"等，将skill目录打包为可分发的.skill文件。
+When user says "package skill", "compile skill", "generate .skill file", etc., package skill directory into distributable .skill file.
 
 ```bash
 python3 scripts/package_skill.py pack <skill-folder> [output-directory]
 ```
 
-**示例**：
+**Examples**:
 ```bash
-# 打包 skill-get，输出到当前目录
+# Package skill-get, output to current directory
 python3 scripts/package_skill.py pack .claude/skills/skill-get
 
-# 打包到指定目录
+# Package to specified directory
 python3 scripts/package_skill.py pack .claude/skills/skill-get ./dist
 ```
 
-**输出**：`<skill-name>.skill` 文件（zip格式）
+**Output**: `<skill-name>.skill` file (zip format)
 
-打包前会自动验证：
-- SKILL.md 存在
-- YAML frontmatter 格式正确
-- name 和 description 字段存在
+Auto-validates before packaging:
+- SKILL.md exists
+- YAML frontmatter format is correct
+- name and description fields exist
 
-#### .skillignore 支持
+#### .skillignore Support
 
-在 skill 目录下创建 `.skillignore` 文件可排除不需要打包的文件：
+Create `.skillignore` file in skill directory to exclude files from packaging:
 
 ```
-# .skillignore 示例
+# .skillignore example
 *.log
 *.tmp
 tests/
@@ -348,274 +350,274 @@ node_modules/
 .env
 ```
 
-**默认忽略**（无需配置）：
+**Default ignores** (no configuration needed):
 - `.git/`, `__pycache__/`, `*.pyc`, `*.pyo`
 - `.DS_Store`, `Thumbs.db`
-- `.skillignore` 本身
+- `.skillignore` itself
 
-### 场景G: 解包Skill
+### Scenario G: Unpack Skill
 
-当用户说"解包skill"、"解压skill"、"提取.skill文件"等，将.skill文件解压到指定目录。
+When user says "unpack skill", "extract skill", "extract .skill file", etc., extract .skill file to specified directory.
 
 ```bash
 python3 scripts/package_skill.py unpack <skill-file> [output-directory]
 ```
 
-**示例**：
+**Examples**:
 ```bash
-# 解包到当前目录
+# Unpack to current directory
 python3 scripts/package_skill.py unpack my-skill.skill
 
-# 解包到 skills 目录
+# Unpack to skills directory
 python3 scripts/package_skill.py unpack my-skill.skill ~/.claude/skills/
 ```
 
-### 场景H: 更新策略库 (自动)
+### Scenario H: Update Strategy Database (Auto)
 
-**重要**: 每次成功完成检索和安装链路后，检查并更新 `references/marketplaces.md`。
+**Important**: After each successful retrieval and installation, check and update `references/marketplaces.md`.
 
-#### 触发条件
+#### Trigger Conditions
 
-当以下情况发生时，自动执行策略库更新：
-1. 在某个 marketplace 成功找到并安装了 skill
-2. 使用了新的搜索方法（如发现新的 API 端点）
-3. 发现现有策略失效或有更好的替代方案
+Auto-execute strategy database update when:
+1. Successfully found and installed a skill from a marketplace
+2. Used a new search method (e.g., discovered new API endpoint)
+3. Found existing strategy failed or better alternative exists
 
-#### 更新流程
+#### Update Flow
 
-**Step 1**: 检查当前策略是否已记录
+**Step 1**: Check if current strategy is recorded
 ```bash
-grep -q "{marketplace-name}" references/marketplaces.md && echo "已存在" || echo "新来源"
+grep -q "{marketplace-name}" references/marketplaces.md && echo "Exists" || echo "New source"
 ```
 
-**Step 2**: 如果是新策略或改进策略，追加/更新到 `references/marketplaces.md`
+**Step 2**: If new or improved strategy, append/update to `references/marketplaces.md`
 
-**Step 3**: 记录内容包括：
-- Marketplace 名称和 URL
-- 可用的 API 端点
-- 搜索方法和示例命令
-- 安装方式
-- 特殊处理（如 Cloudflare 绕过）
+**Step 3**: Record content includes:
+- Marketplace name and URL
+- Available API endpoints
+- Search methods and example commands
+- Installation methods
+- Special handling (e.g., Cloudflare bypass)
 
-#### 更新格式示例
+#### Update Format Example
 
 ```markdown
 ## N. {Marketplace Name} ({domain})
 
-**特点**: {描述}
+**Features**: {description}
 
-**URL格式**:
-- 搜索: `{search-url}`
-- 详情: `{detail-url}`
-- API: `{api-url}` (如果有)
+**URL formats**:
+- Search: `{search-url}`
+- Details: `{detail-url}`
+- API: `{api-url}` (if available)
 
-**数据获取**:
+**Data retrieval**:
 \`\`\`bash
-{获取命令}
+{retrieval command}
 \`\`\`
 
-**安装方式**: `{安装命令}`
+**Installation**: `{install command}`
 
-**发现日期**: {日期}
-**发现途径**: {如何发现这个策略的}
+**Discovery date**: {date}
+**Discovery method**: {how this strategy was discovered}
 ```
 
-#### 策略优先级调整
+#### Strategy Priority Adjustment
 
-如果某个策略被证明比现有策略更有效，应该：
-1. 更新该来源的搜索步骤编号
-2. 更新 SKILL.md 中的搜索顺序
-3. 更新 `默认搜索顺序` 表格
+If a strategy proves more effective than existing ones:
+1. Update that source's search step number
+2. Update search order in SKILL.md
+3. Update `Default Search Order` table
 
 ---
 
-## 安装验证
+## Installation Validation
 
-安装前检查：
+Pre-installation check:
 ```bash
 test -f <path>/SKILL.md && echo "valid" || echo "invalid"
 ```
 
-## 异常处理
+## Error Handling
 
-| 场景 | 处理 |
-|------|------|
-| 来源不存在 | 提示检查地址 |
-| 无SKILL.md | 提示格式不正确 |
-| 同名已存在 | 询问：覆盖/重命名/取消 |
-| 网络错误 | 提示重试 |
-| Cloudflare 403 | 改用 curl + User-Agent，或直接尝试 npx 安装 |
-| npx 安装失败 | 回退到 curl 抓取 GitHub 链接后 git clone |
+| Scenario | Handling |
+|----------|----------|
+| Source doesn't exist | Prompt to check address |
+| No SKILL.md | Prompt incorrect format |
+| Name already exists | Ask: overwrite/rename/cancel |
+| Network error | Prompt to retry |
+| Cloudflare 403 | Use curl + User-Agent, or try npx install directly |
+| npx install failed | Fallback to curl scraping GitHub link then git clone |
 
-## 安装完成提示
+## Installation Complete Prompt
 
-安装完成后，**必须**高亮显示安装来源。
+After installation, **must** highlight the installation source.
 
-**重要**: 链接必须是**完整URL**，禁止使用省略号(...)截断！
+**Important**: Links must be **full URLs**, no ellipsis (...) truncation!
 
-格式如下：
+Format:
 
 ```
-✅ 安装完成: <安装路径>
+✅ Installation complete: <installation-path>
 
 ┌────────────────────────────────────────────────────────────────────────────┐
-│  📦 来源: <来源名称>                                                         │
+│  📦 Source: <source-name>                                                   │
 │  🔗 https://github.com/<owner>/<repo>/path/to/skill                        │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## 示例对话
+## Example Dialogs
 
-### 示例1: 安装skill
+### Example 1: Install skill
 
 ```
-用户: 安装 playwright-testing
+User: install playwright-testing
 
-AI: 🔍 正在搜索 "playwright-testing"...
+AI: 🔍 Searching for "playwright-testing"...
 
-[1/8] 搜索 github.com/anthropics/skills ... ❌ 未找到
-[2/8] 搜索 skillsmp.com ... ✅ 找到匹配！
+[1/8] Searching github.com/anthropics/skills ... ❌ Not found
+[2/8] Searching skillsmp.com ... ✅ Match found!
 
-找到以下结果:
+Found results:
 - playwright-browser-automation (⭐ 234)
-  描述: Model-invoked Playwright automation
+  Description: Model-invoked Playwright automation
 
-安装到哪里？
-[1] 项目级 (.claude/skills/)
-[2] 用户级 (~/.claude/skills/)
+Install to?
+[1] Project-level (.claude/skills/)
+[2] User-level (~/.claude/skills/)
 
-用户: 2
+User: 2
 
-AI: 正在安装...
+AI: Installing...
 
-✅ 安装完成: ~/.claude/skills/playwright-browser-automation
+✅ Installation complete: ~/.claude/skills/playwright-browser-automation
 
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│  📦 来源: skillsmp.com                                                            │
+│  📦 Source: skillsmp.com                                                          │
 │  🔗 https://github.com/anthropics/skills/tree/main/skills/playwright             │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 示例1.1: 未找到skill
+### Example 1.1: Skill not found
 
 ```
-用户: 安装 nonexistent-skill
+User: install nonexistent-skill
 
-AI: 🔍 正在搜索 "nonexistent-skill"...
+AI: 🔍 Searching for "nonexistent-skill"...
 
-[1/9] 搜索 github.com/anthropics/skills ... ❌ 未找到
-[2/9] 搜索 prompts.chat (MCP API) ... ❌ 未找到
-[3/9] 搜索 skills.sh ... ❌ 未找到
-[4/9] 搜索 mcpservers.org/claude-skills ... ❌ 未找到
-[5/9] 搜索 skillhub.club ... ❌ 未找到
-[6/9] 搜索 claudemarketplaces.com ... ❌ 未找到
-[7/9] 搜索 skillsmp.com (npx) ... ❌ 未找到
-[8/9] 搜索 smithery.ai/skills ... ❌ 未找到
-[9/9] 搜索 GitHub (兜底) ... ❌ 未找到
+[1/9] Searching github.com/anthropics/skills ... ❌ Not found
+[2/9] Searching prompts.chat (MCP API) ... ❌ Not found
+[3/9] Searching skills.sh ... ❌ Not found
+[4/9] Searching mcpservers.org/claude-skills ... ❌ Not found
+[5/9] Searching skillhub.club ... ❌ Not found
+[6/9] Searching claudemarketplaces.com ... ❌ Not found
+[7/9] Searching skillsmp.com (npx) ... ❌ Not found
+[8/9] Searching smithery.ai/skills ... ❌ Not found
+[9/9] Searching GitHub (fallback) ... ❌ Not found
 
-❌ 在所有 9 个来源中均未找到 "nonexistent-skill"
+❌ "nonexistent-skill" not found in all 9 sources
 
-您可以：
-1. 检查 skill 名称拼写
-2. 提供 skill 的完整 URL
-3. 创建一个新的 skill
+You can:
+1. Check skill name spelling
+2. Provide skill's full URL
+3. Create a new skill
 ```
 
-### 示例2: skill-get help
+### Example 2: skill-get help
 
 ```
-用户: skill-get help
+User: skill-get help
 
-AI: ## skill-get 帮助
+AI: ## skill-get Help
 
-统一的 Claude Code Skill 安装器，支持从多种来源安装、更新、打包 Skills。
+Unified Claude Code Skill installer, supports installing, updating, and packaging skills from multiple sources.
 
-### 支持的命令
+### Supported Commands
 
-| 命令 | 说明 |
-|------|------|
-| 安装 {name/url} | 安装 skill |
-| 更新 {name} | 更新已安装的 skill |
-| 列出已安装 | 显示所有已安装的 skills |
-| 打包 {path} | 打包 skill 为 .skill 文件 |
-| 解包 {file} | 解压 .skill 文件 |
-| help | 显示此帮助 |
+| Command | Description |
+|---------|-------------|
+| install {name/url} | Install skill |
+| update {name} | Update installed skill |
+| list installed | Show all installed skills |
+| package {path} | Package skill as .skill file |
+| unpack {file} | Extract .skill file |
+| help | Show this help |
 
-### 搜索顺序（按有效性排序，GitHub兜底）
+### Search Order (sorted by effectiveness, GitHub as fallback)
 
-| 优先级 | 来源 | 有效性 | 说明 |
-|--------|------|--------|------|
-| 1 | github.com/anthropics/skills | ⭐ | 官方仓库，API稳定 |
-| 2 | prompts.chat/skills | ⭐⭐ | MCP API最佳 |
+| Priority | Source | Effectiveness | Description |
+|----------|--------|---------------|-------------|
+| 1 | github.com/anthropics/skills | ⭐ | Official repository, stable API |
+| 2 | prompts.chat/skills | ⭐⭐ | Best MCP API |
 | 3 | skills.sh | ⭐⭐ | REST API + npx |
-| 4 | mcpservers.org | ⭐ | 结构化目录 |
-| 5 | skillhub.club | ⭐ | 分类浏览 |
-| 6 | claudemarketplaces.com | ⚠️ | 部分可用 |
-| 7 | skillsmp.com | ❌ | Cloudflare保护 |
-| 8 | smithery.ai | ❌ | 限流严重 |
-| 9 | GitHub搜索 | ⭐ | **兜底**，避免同名混淆 |
+| 4 | mcpservers.org | ⭐ | Structured directory |
+| 5 | skillhub.club | ⭐ | Category browsing |
+| 6 | claudemarketplaces.com | ⚠️ | Partially available |
+| 7 | skillsmp.com | ❌ | Cloudflare protected |
+| 8 | smithery.ai | ❌ | Heavy rate limiting |
+| 9 | GitHub Search | ⭐ | **Fallback**, avoids name collision |
 
-### 自定义搜索顺序
+### Custom Search Order
 
-编辑 `~/.claude/skill-get-config.json`:
+Edit `~/.claude/skill-get-config.json`:
 \`\`\`json
 {
   "marketplaces": ["github.com/anthropics/skills", "prompts.chat/skills", "skills.sh", ..., "github-search"]
 }
 \`\`\`
 
-> **建议**: 将 `github-search` 放在最后作为兜底。
+> **Recommendation**: Keep `github-search` last as a fallback.
 ```
 
-### 示例3: 更新skill
+### Example 3: Update skill
 
 ```
-用户: 更新 playwright-testing
+User: update playwright-testing
 
-AI: 🔍 检查 playwright-testing 更新...
+AI: 🔍 Checking playwright-testing for updates...
 
-📦 当前版本: abc1234 (2025-01-20)
-📦 最新版本: def5678 (2025-01-24)
+📦 Current version: abc1234 (2025-01-20)
+📦 Latest version: def5678 (2025-01-24)
 
-发现新版本！是否更新？
-[1] 更新
-[2] 取消
+New version available! Update?
+[1] Update
+[2] Cancel
 
-用户: 1
+User: 1
 
-AI: 正在更新...
+AI: Updating...
 
-✅ 更新完成: ~/.claude/skills/playwright-testing
+✅ Update complete: ~/.claude/skills/playwright-testing
 
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│  📦 来源: github.com/anthropics/skills                                            │
+│  📦 Source: github.com/anthropics/skills                                          │
 │  🔗 https://github.com/anthropics/skills/tree/main/skills/playwright-testing     │
 │  📝 abc1234 → def5678                                                             │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 示例4: 检查所有更新
+### Example 4: Check all updates
 
 ```
-用户: 检查所有 skill 更新
+User: check all skill updates
 
-AI: 🔍 检查已安装的 skills...
+AI: 🔍 Checking installed skills...
 
-| Skill | 当前版本 | 最新版本 | 状态 |
-|-------|----------|----------|------|
-| playwright-testing | abc1234 | def5678 | ⬆️ 可更新 |
-| docx-converter | v1.0.0 | v1.0.0 | ✅ 已最新 |
-| my-local-skill | - | - | ⏭️ 本地安装 |
+| Skill | Current Version | Latest Version | Status |
+|-------|-----------------|----------------|--------|
+| playwright-testing | abc1234 | def5678 | ⬆️ Updatable |
+| docx-converter | v1.0.0 | v1.0.0 | ✅ Up to date |
+| my-local-skill | - | - | ⏭️ Local install |
 
-发现 1 个可更新的 skill，是否全部更新？
+Found 1 updatable skill, update all?
 ```
 
-### 示例5: 打包skill
+### Example 5: Package skill
 
 ```
-用户: 打包 skill-get
+User: package skill-get
 
-AI: 📦 正在打包 skill-get...
+AI: 📦 Packaging skill-get...
 
 🔍 Validating skill...
 ✅ Skill is valid!
@@ -626,20 +628,20 @@ AI: 📦 正在打包 skill-get...
   Added: skill-get/scripts/package_skill.py
   Added: skill-get/references/marketplaces.md
 
-✅ 打包完成: ./skill-get.skill
+✅ Package complete: ./skill-get.skill
    5 files added, 0 files ignored
 ```
 
-### 示例6: 解包skill
+### Example 6: Unpack skill
 
 ```
-用户: 解包 my-skill.skill 到 ~/.claude/skills/
+User: unpack my-skill.skill to ~/.claude/skills/
 
-AI: 📂 正在解包 my-skill.skill...
+AI: 📂 Unpacking my-skill.skill...
 
 📂 Extracted to: /home/user/.claude/skills/my-skill
   my-skill/SKILL.md
   my-skill/scripts/helper.py
 
-✅ 解包完成: 2 files
+✅ Unpack complete: 2 files
 ```
